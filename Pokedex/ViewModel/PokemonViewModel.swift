@@ -6,48 +6,52 @@
 //
 
 import SwiftUI
+import RxSwift
+import Action
 
 class PokemonViewModel: ObservableObject {
-  @Published var pokemon = [Pokemon]()
-  let baseUrl = "https://pokedex-bb36f.firebaseio.com/pokemon.json"
+  var pokemonService: PokemonServiceProtocol = PokemonService()
+  
+  @Published var pokemonList = [PokemonResponse]()
   
   init() {
-    fetchPokemon()
+    fetchPokemons.execute()
   }
   
-  func fetchPokemon() {
-    guard let url = URL(string: baseUrl) else { return }
-    URLSession.shared.dataTask(with: url) { data, response, error in
-      guard let data = data?.parseData(removeString: "null,") else { return }
-      guard let pokemon = try? JSONDecoder().decode([Pokemon].self, from: data) else { return }
-      
-      DispatchQueue.main.sync {
-        self.pokemon = pokemon
-      }
-    }.resume()
+  lazy var fetchPokemons = CocoaAction { _ in
+    return self.pokemonService.getPokemons()
+      .do( onError: { error -> Void in
+        print("Error \(error)")
+        return
+      }).asObservable()
+        .flatMap { response -> Observable<Void> in
+          let pokemons = response.compactMap { $0 }
+          self.pokemonList = pokemons
+          return Observable.empty()
+        }
   }
   
   func backgroundColor(forType type: String) -> UIColor {
     switch type {
-      case "fire": return .systemRed
-      case "poison": return .systemGreen
-      case "water": return .systemTeal
-      case "electric": return .systemYellow
-      case "psychic": return .systemPurple
-      case "normal": return .systemGray
-      case "ground": return .systemOrange
-      case "flying": return .systemBlue
-      case "fairy": return .systemPink
+      case "fight": return .fighting
+      case "fire": return .fire
+      case "poison": return .poison
+      case "water": return .water
+      case "electric": return .electric
+      case "psychic": return .psychic
+      case "normal": return .normal
+      case "ground": return .ground
+      case "flying": return .flying
+      case "fairy": return .fairy
+      case "dark": return .dark
+      case "grass": return .grass
+      case "ice": return .ice
+      case "bug": return .bug
+      case "rock": return .rock
+      case "dragon": return .dragon
+      case "steel": return .steel
+      case "ghost": return .ghost
       default: return .systemIndigo
     }
-  }
-}
-
-extension Data {
-  func parseData(removeString string: String) -> Data? {
-    let dataAsString = String(data: self, encoding: .utf8)
-    let parsedDataString = dataAsString?.replacingOccurrences(of: string, with: "")
-    guard let data = parsedDataString?.data(using: .utf8) else { return nil }
-    return data
   }
 }
